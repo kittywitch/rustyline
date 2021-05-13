@@ -1,5 +1,7 @@
 //! Customize line editor
 use std::default::Default;
+// inputrc Parser
+use crate::{inputrc, inputrc::Directive};
 
 /// User preferences
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -298,6 +300,37 @@ impl Builder {
         Self {
             p: Config::default(),
         }
+    }
+
+    /// Parses an inputrc file and reads it into the builder.
+    pub fn ingest_inputrc(mut self) -> Result<Self, std::io::Error> {
+        let inputrc_config = inputrc::load_inputrc()?;
+
+        for directive in inputrc_config {
+            match directive {
+                Directive::SetVariable(key, value) => match key.as_str() {
+                    "editing-mode" => {
+                        self = self.edit_mode(match value.as_str() {
+                            "vi" => EditMode::Vi,
+                            "emacs" | _ => EditMode::Emacs,
+                        })
+                    }
+                    "bell-style" => {
+                        self = self.bell_style(match value.as_str() {
+                            "none" => BellStyle::None,
+                            "visible" => BellStyle::Visible,
+                            "audible" | _ => BellStyle::Audible,
+                        })
+                    }
+                    "keyseq-timeout" => {
+                        self = self.keyseq_timeout(value.parse::<i32>().unwrap_or_default())
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+        }
+        Ok(self)
     }
 
     /// Set the maximum length for the history.
